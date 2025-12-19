@@ -4,15 +4,16 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-le
 import 'leaflet/dist/leaflet.css';
 
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Wind, Map as MapIcon, Activity, Trophy, AlertTriangle, Clock, Sun, Moon, Info, Calendar } from 'lucide-react';
+import { Wind, Map as MapIcon, Activity, Trophy, AlertTriangle, Clock, Sun, Moon, Info, Calendar, Thermometer, Droplets, Signal, Globe } from 'lucide-react';
 
 // --- COMPONENT: NAV BAR ---
 const NavBar = ({ activeTab, setActiveTab }) => (
   <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-full px-6 py-3 shadow-2xl z-[1000] flex gap-8">
     {[
       { id: 'dashboard', icon: Activity, label: 'Overview' },
+      { id: 'live', icon: Signal, label: 'Live Monitor' },
       { id: 'map', icon: MapIcon, label: 'Live Map' },
-      { id: 'forecast', icon: Calendar, label: 'Forecast' }, // Merged Tab
+      { id: 'forecast', icon: Calendar, label: 'Forecast' },
     ].map((item) => (
       <button
         key={item.id}
@@ -33,7 +34,6 @@ const NavBar = ({ activeTab, setActiveTab }) => (
 // --- COMPONENT: PAGE 1 (DASHBOARD) ---
 const DashboardPage = ({ stats }) => (
   <div className="space-y-8 animate-in fade-in duration-500">
-    {/* Hero Section */}
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700 p-8 md:p-12 text-center">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 via-purple-500 to-orange-500"></div>
       <Wind className="mx-auto text-teal-400 mb-6" size={48} />
@@ -45,9 +45,7 @@ const DashboardPage = ({ stats }) => (
       </p>
     </div>
 
-    {/* Stats Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Cleanest Cities */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
         <div className="flex items-center gap-3 mb-6">
           <Trophy className="text-teal-400" />
@@ -66,7 +64,6 @@ const DashboardPage = ({ stats }) => (
         </div>
       </div>
 
-      {/* Most Polluted */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
         <div className="flex items-center gap-3 mb-6">
           <AlertTriangle className="text-rose-500" />
@@ -88,7 +85,113 @@ const DashboardPage = ({ stats }) => (
   </div>
 );
 
-// --- COMPONENT: PAGE 2 (MAP) ---
+// --- COMPONENT: PAGE 2 (LIVE SENSOR) ---
+const LiveSensorPage = () => {
+  const [sensorData, setSensorData] = useState(null);
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Polls /api/sensor/latest.
+        // Backend logic: If local sensor data exists, return it.
+        // Else, fetch Kolkata API data and return that as "simulated" sensor data.
+        const liveRes = await fetch('http://localhost:8080/api/sensor/latest');
+        const liveJson = await liveRes.json();
+        setSensorData(liveJson);
+
+        const histRes = await fetch('http://localhost:8080/api/sensor/history');
+        const histJson = await histRes.json();
+        setHistory(histJson);
+      } catch (err) {
+        console.error("Sensor Error:", err);
+      }
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 5000); // Poll every 5s
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="space-y-8 animate-in fade-in">
+      <div className="flex justify-between items-end border-b border-slate-800 pb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-2">Live Monitor</h2>
+          <p className="text-slate-400">
+            {sensorData?.is_simulation ? "Simulating local node via Kolkata API Stream." : "Real-time telemetry from local ESP32 node."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-teal-900/30 border border-teal-800 rounded-full text-teal-400 text-xs font-mono animate-pulse">
+          <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+          STREAM ACTIVE
+        </div>
+      </div>
+
+      {sensorData && sensorData.status !== 'offline' ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-orange-500/50 transition-colors group">
+            <Thermometer className="mx-auto text-slate-600 group-hover:text-orange-400 transition-colors mb-3" size={28} />
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Temperature</p>
+            <p className="text-3xl font-bold text-white font-mono">{sensorData.temperature}°C</p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-blue-500/50 transition-colors group">
+            <Droplets className="mx-auto text-slate-600 group-hover:text-blue-400 transition-colors mb-3" size={28} />
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Humidity</p>
+            <p className="text-3xl font-bold text-white font-mono">{sensorData.humidity}%</p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-slate-500/50 transition-colors group">
+            <Wind className="mx-auto text-slate-600 group-hover:text-slate-300 transition-colors mb-3" size={28} />
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">CO2 Level</p>
+            <p className="text-3xl font-bold text-white font-mono">{sensorData.co2_ppm || "--"} <span className="text-xs text-slate-500">PPM</span></p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center relative overflow-hidden group">
+            <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity ${sensorData.aqi > 100 ? 'bg-rose-500' : 'bg-teal-500'}`}></div>
+            <Activity className={`mx-auto mb-3 ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`} size={28} />
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Local AQI</p>
+            <p className={`text-3xl font-bold font-mono ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`}>{sensorData.aqi}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="h-40 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+          <Globe className="mb-2 animate-bounce" />
+          <p>Connecting to Sensor Network...</p>
+        </div>
+      )}
+
+      {/* Historical Chart */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+        <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+          <Clock size={18} className="text-teal-400" />
+          Sensor History (Last 24 Hours)
+        </h3>
+        <div className="h-[300px] w-full">
+          {history.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={history}>
+                <defs>
+                  <linearGradient id="sensorAqi" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2dd4bf" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#2dd4bf" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                <XAxis dataKey="time" tick={{fontSize: 10, fill: '#64748b'}} tickFormatter={(v) => v.slice(5,10)} axisLine={false} tickLine={false} />
+                <YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                <RechartsTooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}} itemStyle={{color: '#2dd4bf'}} />
+                <Area type="monotone" dataKey="aqi" stroke="#2dd4bf" strokeWidth={2} fillOpacity={1} fill="url(#sensorAqi)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-600">No history data available yet</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- COMPONENT: PAGE 3 (MAP) ---
 const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
   const getAqiColor = (aqi) => {
     if (aqi <= 50) return '#2dd4bf'; // teal
@@ -118,8 +221,7 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
             <CircleMarker
               key={city.city_name}
               center={[city.lat, city.lng]}
-              // FIXED: Reduced radius size for better visibility
-              radius={Math.min(Math.max(5, city.avg_aqi / 20), 15)}
+              radius={Math.min(Math.max(3, Math.log(city.avg_aqi || 10) * 3), 15)}
               pathOptions={{
                 color: getAqiColor(city.avg_aqi),
                 fillColor: getAqiColor(city.avg_aqi),
@@ -144,11 +246,8 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
 
       {/* Detail Column */}
       <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 flex flex-col">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          {selectedCity ? selectedCity : "Select a City"}
-        </h2>
+        <h2 className="text-2xl font-bold text-white mb-2">{selectedCity ? selectedCity : "Select a City"}</h2>
         <p className="text-slate-500 text-sm mb-6">Historical Analysis</p>
-
         <div className="flex-1 min-h-[300px]">
           {trendData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -162,17 +261,12 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                 <XAxis dataKey="time" tick={{fontSize: 10, fill: '#475569'}} tickFormatter={(v)=>v.slice(0,4)} axisLine={false} tickLine={false} />
                 <YAxis tick={{fontSize: 10, fill: '#475569'}} axisLine={false} tickLine={false} />
-                <RechartsTooltip
-                  contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}}
-                  itemStyle={{color: '#2dd4bf'}}
-                />
+                <RechartsTooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}} itemStyle={{color: '#2dd4bf'}} />
                 <Area type="monotone" dataKey="aqi" stroke="#2dd4bf" strokeWidth={2} fillOpacity={1} fill="url(#colorAqi)" />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-600 text-sm">
-              Click a circle on the map
-            </div>
+            <div className="h-full flex items-center justify-center text-slate-600 text-sm">Click a circle on the map</div>
           )}
         </div>
       </div>
@@ -180,7 +274,7 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
   );
 };
 
-// --- COMPONENT: PAGE 3 (MERGED FORECAST & PLANNER) ---
+// --- COMPONENT: PAGE 4 (FORECAST) ---
 const ForecastPage = () => {
   const [city, setCity] = useState("Delhi");
   const [forecast, setForecast] = useState([]);
@@ -189,8 +283,6 @@ const ForecastPage = () => {
 
   useEffect(() => {
     setLoading(true);
-    // Fetch BOTH Forecast and Hourly Analysis
-    // Updated port to 8080
     Promise.all([
       fetch(`http://localhost:8080/api/predict/${city}`).then(res => res.json()),
       fetch(`http://localhost:8080/api/analysis/hourly/${city}`).then(res => res.json())
@@ -309,7 +401,6 @@ export default function App() {
 
   useEffect(() => {
     // Initial Data Fetch
-    // Updated port to 8080
     Promise.all([
       fetch('http://localhost:8080/api/heatmap'),
       fetch('http://localhost:8080/api/stats')
@@ -319,8 +410,6 @@ export default function App() {
         setMapData(mapJson);
         setStats(await statsRes.json());
         if (mapJson.length > 0) handleCityClick(mapJson[0].city_name);
-      } else {
-        console.error("Failed to fetch initial data");
       }
     }).catch(err => console.error("API Error:", err));
   }, []);
@@ -341,14 +430,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-teal-500/30">
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pb-32">
-
-        {/* TAB CONTENT SWITCHER */}
         {activeTab === 'dashboard' && <DashboardPage stats={stats} />}
+        {activeTab === 'live' && <LiveSensorPage />}
         {activeTab === 'map' && <MapPage mapData={mapData} selectedCity={selectedCity} handleCityClick={handleCityClick} trendData={trendData} />}
         {activeTab === 'forecast' && <ForecastPage />}
-
       </div>
-
       <NavBar activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
