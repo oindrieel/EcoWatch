@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+// ✅ REAL IMPORTS (Active)
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { Wind, Map as MapIcon, Activity, Trophy, AlertTriangle, Clock, Sun, Moon, Info } from 'lucide-react';
+
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { Wind, Map as MapIcon, Activity, Trophy, AlertTriangle, Clock, Sun, Moon, Info, Calendar } from 'lucide-react';
 
 // --- COMPONENT: NAV BAR ---
 const NavBar = ({ activeTab, setActiveTab }) => (
@@ -10,7 +12,7 @@ const NavBar = ({ activeTab, setActiveTab }) => (
     {[
       { id: 'dashboard', icon: Activity, label: 'Overview' },
       { id: 'map', icon: MapIcon, label: 'Live Map' },
-      { id: 'planner', icon: Clock, label: 'Planner' },
+      { id: 'forecast', icon: Calendar, label: 'Forecast' }, // Merged Tab
     ].map((item) => (
       <button
         key={item.id}
@@ -116,7 +118,8 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
             <CircleMarker
               key={city.city_name}
               center={[city.lat, city.lng]}
-              radius={Math.max(6, city.avg_aqi / 15)}
+              // FIXED: Reduced radius size for better visibility
+              radius={Math.min(Math.max(5, city.avg_aqi / 20), 15)}
               pathOptions={{
                 color: getAqiColor(city.avg_aqi),
                 fillColor: getAqiColor(city.avg_aqi),
@@ -177,84 +180,121 @@ const MapPage = ({ mapData, selectedCity, handleCityClick, trendData }) => {
   );
 };
 
-// --- COMPONENT: PAGE 3 (PLANNER) ---
-const PlannerPage = () => {
-  const [city, setCity] = useState("Ahmedabad"); // Default
+// --- COMPONENT: PAGE 3 (MERGED FORECAST & PLANNER) ---
+const ForecastPage = () => {
+  const [city, setCity] = useState("Delhi");
+  const [forecast, setForecast] = useState([]);
   const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/analysis/hourly/${city}`)
-      .then(res => res.json())
-      .then(data => setAnalysis(data))
-      .catch(err => console.error(err));
+    setLoading(true);
+    // Fetch BOTH Forecast and Hourly Analysis
+    // Updated port to 8080
+    Promise.all([
+      fetch(`http://localhost:8080/api/predict/${city}`).then(res => res.json()),
+      fetch(`http://localhost:8080/api/analysis/hourly/${city}`).then(res => res.json())
+    ]).then(([forecastData, analysisData]) => {
+      setForecast(forecastData.forecast || []);
+      setAnalysis(analysisData);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
   }, [city]);
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Smart Planner</h2>
-          <p className="text-slate-400">AI-driven analysis of hourly pollution cycles.</p>
-        </div>
+  const cities = ["Ahmedabad", "Delhi", "Mumbai", "Kolkata", "Bengaluru", "Chennai", "Hyderabad", "Lucknow"];
 
-        {analysis && !analysis.error && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-teal-900/20 border border-teal-800/50 p-6 rounded-2xl">
-              <div className="flex items-center gap-2 text-teal-400 mb-2">
-                <Sun size={20} />
-                <span className="font-bold text-sm uppercase">Best Time</span>
+  return (
+    <div className="space-y-8 animate-in fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-2">AI Analysis & Forecasting</h2>
+          <p className="text-slate-400">Integrated predictive modeling and hourly cycle analysis.</p>
+        </div>
+        <select
+          className="bg-slate-800 text-white border border-slate-700 rounded-lg px-4 py-2 outline-none focus:border-teal-500"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+        >
+          {cities.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="h-64 flex items-center justify-center text-teal-400 animate-pulse">Analyzing Data...</div>
+      ) : (
+        <>
+          {/* Section 1: 5-Day Forecast */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {forecast.map((day, i) => (
+              <div key={day.date} className={`relative overflow-hidden rounded-2xl border p-4 ${i === 0 ? 'bg-gradient-to-b from-teal-900/20 to-slate-900 border-teal-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                {i === 0 && <span className="absolute top-2 right-2 text-[10px] bg-teal-500/20 text-teal-300 px-2 rounded-full border border-teal-500/30">TODAY</span>}
+                <p className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">{day.date}</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-white">{day.aqi}</span>
+                  <span className="text-xs text-slate-500">AQI</span>
+                </div>
+                <p className={`text-xs mt-2 font-medium ${day.aqi > 200 ? 'text-rose-400' : 'text-teal-400'}`}>{day.status}</p>
               </div>
-              <div className="text-3xl font-bold text-white">{analysis.best_time.hour}:00</div>
-              <div className="text-teal-200/60 text-sm mt-1">{analysis.best_time.avg_aqi} AQI (Avg)</div>
+            ))}
+          </div>
+
+          {/* Section 2: Hourly Planner */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-4">
+              {analysis && !analysis.error && (
+                <>
+                  <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-teal-400 font-bold uppercase mb-1">Best Time</p>
+                      <p className="text-2xl font-bold text-white">{analysis.best_time.hour}:00</p>
+                    </div>
+                    <Sun className="text-teal-400" />
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-rose-400 font-bold uppercase mb-1">Worst Time</p>
+                      <p className="text-2xl font-bold text-white">{analysis.worst_time.hour}:00</p>
+                    </div>
+                    <AlertTriangle className="text-rose-400" />
+                  </div>
+                </>
+              )}
+              <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl">
+                <p className="text-slate-400 text-sm italic">
+                  "Based on historical patterns for {city}, aim for outdoor activities during the 'Best Time' window."
+                </p>
+              </div>
             </div>
 
-            <div className="bg-rose-900/20 border border-rose-800/50 p-6 rounded-2xl">
-              <div className="flex items-center gap-2 text-rose-400 mb-2">
-                <AlertTriangle size={20} />
-                <span className="font-bold text-sm uppercase">Worst Time</span>
+            <div className="lg:col-span-2 bg-slate-900 rounded-3xl border border-slate-800 p-6">
+              <h3 className="text-slate-400 text-sm font-bold uppercase mb-6 tracking-wider">Typical 24-Hour Cycle</h3>
+              <div className="h-[250px]">
+                {analysis && analysis.hourly_curve ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={analysis.hourly_curve}>
+                      <defs>
+                        <linearGradient id="plannerGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                      <XAxis dataKey="hour" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}} labelStyle={{color: '#94a3b8'}} />
+                      <Area type="monotone" dataKey="avg_aqi" stroke="#818cf8" strokeWidth={3} fill="url(#plannerGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-600">Loading Analysis...</div>
+                )}
               </div>
-              <div className="text-3xl font-bold text-white">{analysis.worst_time.hour}:00</div>
-              <div className="text-rose-200/60 text-sm mt-1">{analysis.worst_time.avg_aqi} AQI (Avg)</div>
             </div>
           </div>
-        )}
-
-        <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-          <h3 className="text-white font-bold mb-4">Recommendation</h3>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Based on historical data for <span className="text-teal-400 font-bold">{city}</span>, air quality is typically best in the early afternoon.
-            Avoid outdoor exercise during peak traffic hours shown in red below.
-          </p>
-        </div>
-      </div>
-
-      {/* Chart Column */}
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 p-6">
-        <h3 className="text-slate-400 text-sm font-bold uppercase mb-6 tracking-wider">24-Hour Pollution Cycle</h3>
-        <div className="h-[300px]">
-          {analysis && analysis.hourly_curve ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analysis.hourly_curve}>
-                <defs>
-                  <linearGradient id="plannerGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                <XAxis dataKey="hour" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}}
-                  labelStyle={{color: '#94a3b8'}}
-                />
-                <Area type="monotone" dataKey="avg_aqi" stroke="#818cf8" strokeWidth={3} fill="url(#plannerGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-slate-600">Loading Analysis...</div>
-          )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };
@@ -269,22 +309,33 @@ export default function App() {
 
   useEffect(() => {
     // Initial Data Fetch
+    // Updated port to 8080
     Promise.all([
       fetch('http://localhost:8080/api/heatmap'),
       fetch('http://localhost:8080/api/stats')
     ]).then(async ([mapRes, statsRes]) => {
-      const mapJson = await mapRes.json();
-      setMapData(mapJson);
-      setStats(await statsRes.json());
-      if (mapJson.length > 0) handleCityClick(mapJson[0].city_name);
+      if (mapRes.ok && statsRes.ok) {
+        const mapJson = await mapRes.json();
+        setMapData(mapJson);
+        setStats(await statsRes.json());
+        if (mapJson.length > 0) handleCityClick(mapJson[0].city_name);
+      } else {
+        console.error("Failed to fetch initial data");
+      }
     }).catch(err => console.error("API Error:", err));
   }, []);
 
   const handleCityClick = async (cityName) => {
     setSelectedCity(cityName);
-    const res = await fetch(`http://localhost:8080/api/trends/${cityName}`);
-    const json = await res.json();
-    setTrendData(json.data);
+    try {
+      const res = await fetch(`http://localhost:8080/api/trends/${cityName}`);
+      if (res.ok) {
+        const json = await res.json();
+        setTrendData(json.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -294,7 +345,7 @@ export default function App() {
         {/* TAB CONTENT SWITCHER */}
         {activeTab === 'dashboard' && <DashboardPage stats={stats} />}
         {activeTab === 'map' && <MapPage mapData={mapData} selectedCity={selectedCity} handleCityClick={handleCityClick} trendData={trendData} />}
-        {activeTab === 'planner' && <PlannerPage />}
+        {activeTab === 'forecast' && <ForecastPage />}
 
       </div>
 
