@@ -1,0 +1,16 @@
+name: ecowatch-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+    - fastapi
+    - uvicorn
+    - requests
+    - pandas
+    - numpy
+    - scikit-learn
+    - pydantic
+    - openpyxl

@@ -160,7 +160,7 @@ const LiveSensorPage = () => {
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center relative overflow-hidden group">
             <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity ${sensorData.aqi > 100 ? 'bg-rose-500' : 'bg-teal-500'}`}></div>
             <Activity className={`mx-auto mb-3 ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`} size={28} />
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Local AQI (API)</p>
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Local AQI</p>
             <p className={`text-3xl font-bold font-mono ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`}>{sensorData.aqi}</p>
         </div>
       </div>
@@ -169,7 +169,7 @@ const LiveSensorPage = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
         <h3 className="text-white font-bold mb-6 flex items-center gap-2">
           <Clock size={18} className="text-teal-400" />
-          Sensor History (Kolkata Trend)
+          AQI History
         </h3>
         <div className="h-[300px] w-full">
           {history && history.length > 0 ? (
@@ -329,7 +329,7 @@ const ForecastPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               {forecast.map((day, i) => (
                 <div key={day.date} className={`relative overflow-hidden rounded-2xl border p-4 ${i === 0 ? 'bg-gradient-to-b from-teal-900/20 to-slate-900 border-teal-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
-                  {i === 0 && <span className="absolute top-2 right-2 text-[10px] bg-teal-500/20 text-teal-300 px-2 rounded-full border border-teal-500/30">TODAY</span>}
+                  {i === 0 && <span className="absolute top-2 right-2 text-[10px] bg-teal-500/20 text-teal-300 px-2 rounded-full border border-teal-500/30">Tommorow</span>}
                   <p className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">{day.date}</p>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-white">{day.aqi}</span>
