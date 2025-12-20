@@ -11,7 +11,7 @@ const NavBar = ({ activeTab, setActiveTab }) => (
   <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-full px-6 py-3 shadow-2xl z-[1000] flex gap-8">
     {[
       { id: 'dashboard', icon: Activity, label: 'Overview' },
-      { id: 'live', icon: Signal, label: 'Live Monitor' },
+      { id: 'live', icon: Signal, label: 'Live Sensor' },
       { id: 'map', icon: MapIcon, label: 'Live Map' },
       { id: 'forecast', icon: Calendar, label: 'Forecast' },
     ].map((item) => (
@@ -87,29 +87,39 @@ const DashboardPage = ({ stats }) => (
 
 // --- COMPONENT: PAGE 2 (LIVE SENSOR) ---
 const LiveSensorPage = () => {
-  const [sensorData, setSensorData] = useState(null);
+  // Initialize with safe defaults so it never crashes on null
+  const [sensorData, setSensorData] = useState({
+    temperature: 0,
+    humidity: 0,
+    mq135_raw: 0,
+    co2_ppm: 0,
+    aqi: 0,
+    status: 'loading'
+  });
   const [history, setHistory] = useState([]);
+  const city = "Kolkata";
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Polls /api/sensor/latest.
-        // Backend logic: If local sensor data exists, return it.
-        // Else, fetch Kolkata API data and return that as "simulated" sensor data.
         const liveRes = await fetch('http://localhost:8080/api/sensor/latest');
-        const liveJson = await liveRes.json();
-        setSensorData(liveJson);
+        if (liveRes.ok) {
+            const liveJson = await liveRes.json();
+            setSensorData(liveJson);
+        }
 
         const histRes = await fetch('http://localhost:8080/api/sensor/history');
-        const histJson = await histRes.json();
-        setHistory(histJson);
+        if(histRes.ok) {
+            const histJson = await histRes.json();
+            setHistory(histJson);
+        }
       } catch (err) {
         console.error("Sensor Error:", err);
       }
     };
 
-    fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, 5000); // Poll every 5s
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -117,9 +127,9 @@ const LiveSensorPage = () => {
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-end border-b border-slate-800 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Live Monitor</h2>
+          <h2 className="text-3xl font-bold text-white mb-2">Live Local Sensor</h2>
           <p className="text-slate-400">
-            {sensorData?.is_simulation ? "Simulating local node via Kolkata API Stream." : "Real-time telemetry from local ESP32 node."}
+            Hybrid Mode: Local Telemetry + API Air Quality ({city}).
           </p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1 bg-teal-900/30 border border-teal-800 rounded-full text-teal-400 text-xs font-mono animate-pulse">
@@ -128,45 +138,41 @@ const LiveSensorPage = () => {
         </div>
       </div>
 
-      {sensorData && sensorData.status !== 'offline' ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-orange-500/50 transition-colors group">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* ESP32 Data */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-orange-500/50 transition-colors group">
             <Thermometer className="mx-auto text-slate-600 group-hover:text-orange-400 transition-colors mb-3" size={28} />
             <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Temperature</p>
             <p className="text-3xl font-bold text-white font-mono">{sensorData.temperature}°C</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-blue-500/50 transition-colors group">
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-blue-500/50 transition-colors group">
             <Droplets className="mx-auto text-slate-600 group-hover:text-blue-400 transition-colors mb-3" size={28} />
             <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Humidity</p>
             <p className="text-3xl font-bold text-white font-mono">{sensorData.humidity}%</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-slate-500/50 transition-colors group">
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center hover:border-slate-500/50 transition-colors group">
             <Wind className="mx-auto text-slate-600 group-hover:text-slate-300 transition-colors mb-3" size={28} />
             <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">CO2 Level</p>
-            <p className="text-3xl font-bold text-white font-mono">{sensorData.co2_ppm || "--"} <span className="text-xs text-slate-500">PPM</span></p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center relative overflow-hidden group">
+            <p className="text-3xl font-bold text-white font-mono">{sensorData.co2_ppm ? sensorData.co2_ppm.toFixed(0) : "0"} <span className="text-xs text-slate-500">PPM</span></p>
+        </div>
+
+        {/* API Data (Kolkata) */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center relative overflow-hidden group">
             <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity ${sensorData.aqi > 100 ? 'bg-rose-500' : 'bg-teal-500'}`}></div>
             <Activity className={`mx-auto mb-3 ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`} size={28} />
-            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Local AQI</p>
+            <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Local AQI (API)</p>
             <p className={`text-3xl font-bold font-mono ${sensorData.aqi > 100 ? 'text-rose-400' : 'text-teal-400'}`}>{sensorData.aqi}</p>
-          </div>
         </div>
-      ) : (
-        <div className="h-40 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-          <Globe className="mb-2 animate-bounce" />
-          <p>Connecting to Sensor Network...</p>
-        </div>
-      )}
+      </div>
 
       {/* Historical Chart */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
         <h3 className="text-white font-bold mb-6 flex items-center gap-2">
           <Clock size={18} className="text-teal-400" />
-          Sensor History (Last 24 Hours)
+          Sensor History (Kolkata Trend)
         </h3>
         <div className="h-[300px] w-full">
-          {history.length > 0 ? (
+          {history && history.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={history}>
                 <defs>
@@ -183,7 +189,7 @@ const LiveSensorPage = () => {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-600">No history data available yet</div>
+            <div className="h-full flex items-center justify-center text-slate-600">Loading historical data...</div>
           )}
         </div>
       </div>
@@ -318,19 +324,42 @@ const ForecastPage = () => {
         <div className="h-64 flex items-center justify-center text-teal-400 animate-pulse">Analyzing Data...</div>
       ) : (
         <>
-          {/* Section 1: 5-Day Forecast */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {forecast.map((day, i) => (
-              <div key={day.date} className={`relative overflow-hidden rounded-2xl border p-4 ${i === 0 ? 'bg-gradient-to-b from-teal-900/20 to-slate-900 border-teal-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
-                {i === 0 && <span className="absolute top-2 right-2 text-[10px] bg-teal-500/20 text-teal-300 px-2 rounded-full border border-teal-500/30">TODAY</span>}
-                <p className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">{day.date}</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-white">{day.aqi}</span>
-                  <span className="text-xs text-slate-500">AQI</span>
+          {/* Section 1: 5-Day Forecast with Chart */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              {forecast.map((day, i) => (
+                <div key={day.date} className={`relative overflow-hidden rounded-2xl border p-4 ${i === 0 ? 'bg-gradient-to-b from-teal-900/20 to-slate-900 border-teal-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                  {i === 0 && <span className="absolute top-2 right-2 text-[10px] bg-teal-500/20 text-teal-300 px-2 rounded-full border border-teal-500/30">TODAY</span>}
+                  <p className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">{day.date}</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-white">{day.aqi}</span>
+                    <span className="text-xs text-slate-500">AQI</span>
+                  </div>
+                  <p className={`text-xs mt-2 font-medium ${day.aqi > 200 ? 'text-rose-400' : 'text-teal-400'}`}>{day.status}</p>
                 </div>
-                <p className={`text-xs mt-2 font-medium ${day.aqi > 200 ? 'text-rose-400' : 'text-teal-400'}`}>{day.status}</p>
+              ))}
+            </div>
+
+            {/* Forecast Trend Chart (NEW) */}
+            <div className="bg-slate-900 rounded-3xl border border-slate-800 p-6">
+              <h3 className="text-slate-400 text-sm font-bold uppercase mb-6 tracking-wider">5-Day Prediction Trend</h3>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={forecast}>
+                    <defs>
+                      <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                    <XAxis dataKey="date" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px'}} labelStyle={{color: '#94a3b8'}} />
+                    <Area type="monotone" dataKey="aqi" stroke="#14b8a6" strokeWidth={3} fill="url(#forecastGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Section 2: Hourly Planner */}
@@ -401,6 +430,7 @@ export default function App() {
 
   useEffect(() => {
     // Initial Data Fetch
+    // Updated port to 8080
     Promise.all([
       fetch('http://localhost:8080/api/heatmap'),
       fetch('http://localhost:8080/api/stats')
@@ -410,6 +440,8 @@ export default function App() {
         setMapData(mapJson);
         setStats(await statsRes.json());
         if (mapJson.length > 0) handleCityClick(mapJson[0].city_name);
+      } else {
+        console.error("Failed to fetch initial data");
       }
     }).catch(err => console.error("API Error:", err));
   }, []);
