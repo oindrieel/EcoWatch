@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import uvicorn
 
 # ================= CONFIGURATION =================
-WAQI_TOKEN = "f4b27249a9b4af0009e286a346517d39c627c160"  # <--- PASTE YOUR REAL TOKEN HERE
+WAQI_TOKEN = ""  # <--- PASTE YOUR REAL TOKEN HERE
 MODELS_DIR = "saved_models"
 DB_NAME = "aqi_data.db"
 # =================================================
